@@ -1,6 +1,6 @@
 export type DateType = Date | string;
 
-export type Message = Record<string, string | boolean | DateType | number>;
+export type Message<T = string | boolean | DateType | number> = Record<string, T>;
 
 export type StringFilter = {
     type: 'string';
