@@ -41,3 +41,4 @@ export type AndFilter = {
 };
 
 export type Filter = StringFilter | NumberFilter | BooleanFilter | DateFilter | OrFilter | AndFilter;
+export type PrimitiveFilter = StringFilter | NumberFilter | BooleanFilter;
