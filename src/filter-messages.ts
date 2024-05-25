@@ -1,24 +1,33 @@
 import {
     AndFilter,
     BooleanFilter,
-    DateFilter,
+    DateFilter, DateType,
     Filter,
     Message,
     NumberFilter,
     OrFilter,
-    PrimitiveFilter,
+    SimpleFilter,
     StringFilter
 } from "./domain";
 
 type FilterCb = (message: Message, filter: Filter) => boolean;
 type OperationCb<T> = (targetValue: T, filterValue: T) => boolean;
-type Primitive = 'string' | 'number' | 'boolean';
+type ValidationCb = (value: unknown) => boolean;
 
-const checkOnType = <T extends Primitive>(value: unknown, type: T, exitOnError = true): value is T => {
-    if (typeof value !== type && exitOnError) {
-        throw new Error(`Type of value "${value}" is not of type ${type}`);
+const coerceDateLikeToDateOperationCb = (cb: OperationCb<DateType>): OperationCb<Date> => (targetValue: DateType, filterValue: DateType) => {
+    const targetDate = new Date(targetValue);
+    const filterDate = new Date(filterValue);
+
+    return cb(targetDate, filterDate)
+}
+
+const checkOnType = (type: unknown): ValidationCb => {
+    return (value: unknown) => {
+        if (typeof value !== type) {
+            throw new Error(`Type of value "${value}" is not of type ${type}`);
+        }
+        return true;
     }
-    return typeof value === type;
 }
 
 const checkOperationExist = <T extends Record<string, OperationCb<any>>>(operationType: keyof T, map: T, filterType: string): operationType is keyof T => {
@@ -28,100 +37,77 @@ const checkOperationExist = <T extends Record<string, OperationCb<any>>>(operati
     throw new Error(`Operation "${operationType.toString()}" doesn't exist for "${filterType}" filter type`)
 }
 
-const checkOnDate = (cb: FilterCb): FilterCb => {
-    return (message: Message, filter: DateFilter) => {
-        let targetDate: unknown = message[filter.field];
-        let filterDate: unknown = filter.value;
+const checkOnCorrectDate: ValidationCb = (value: unknown): boolean => {
+    let _value = value;
 
-        if (targetDate === 'string') {
-            targetDate = new Date(targetDate);
-
-            message = {
-                ...message,
-                [filter.field]: targetDate as Date,
-            }
-        }
-        if (filterDate === 'string') {
-            targetDate = new Date(filterDate);
-
-            filter = {
-                ...filter,
-                value: targetDate as Date,
-            }
-        }
-
-        if (!(targetDate instanceof Date)) {
-            throw new Error(`Value of field "${filter.field}" is not of type Date`);
-        }
-        if (!(filterDate instanceof Date)) {
-            throw new Error(`Value of filter "${filter.value}" is not of type Date`);
-        }
-        if (isNaN(targetDate.getTime())) {
-            throw new Error(`Value of field "${filter.field}" may not be correctly coerced to type Date`);
-        }
-        if (isNaN(filterDate.getTime())) {
-            throw new Error(`Value of filter "${filter.value}" may not be correctly coerced to type Date`);
-        }
-
-        return cb(message, filter);
+    if (_value === 'string') {
+        _value = new Date(_value);
     }
+
+    if (!(_value instanceof Date)) {
+        throw new Error(`Value of field "${value}" is not of type Date`);
+    }
+    if (isNaN(_value.getTime())) {
+        throw new Error(`Value of field "${value}" may not be correctly coerced to type Date`);
+    }
+
+    return true;
 };
 
 const stringTypeFilterToOperationMap: Record<StringFilter['operation'], OperationCb<string>> = {
-    eq: (target: string, filter: string) => target === filter,
-    startsWith: (target: string, filter: string) => target.startsWith(filter),
-    endsWith: (target: string, filter: string) => target.endsWith(filter),
-    contains: (target: string, filter: string) => target.includes(filter),
+    eq: (target, filter) => target === filter,
+    startsWith: (target, filter) => target.startsWith(filter),
+    endsWith: (target, filter) => target.endsWith(filter),
+    contains: (target, filter) => target.includes(filter),
 };
 
-const numberTypeFilterToOperationMap: Record<NumberFilter['operation'], (message: Message, filter: NumberFilter) => boolean> = {
-    eq: (message: Message, filter: NumberFilter) => +message[filter.field] === filter.value,
-    gt: (message: Message, filter: NumberFilter) => +message[filter.field] > filter.value,
-    lt: (message: Message, filter: NumberFilter) => +message[filter.field] < filter.value,
-    gte: (message: Message, filter: NumberFilter) => +message[filter.field] >= filter.value,
-    lte: (message: Message, filter: NumberFilter) => +message[filter.field] <= filter.value,
+const numberTypeFilterToOperationMap: Record<NumberFilter['operation'], OperationCb<number>> = {
+    eq: (target, filter) => target === filter,
+    gt: (target, filter) => target > filter,
+    lt: (target, filter) => target < filter,
+    gte: (target, filter) => target >= filter,
+    lte: (target, filter) => target <= filter,
 };
 
-const booleanTypeFilterToOperationMap: Record<BooleanFilter['operation'], (message: Message, filter: BooleanFilter) => boolean> = {
-    eq: (message: Message, filter: BooleanFilter) => message[filter.field] === filter.value,
+const booleanTypeFilterToOperationMap: Record<BooleanFilter['operation'], OperationCb<boolean>> = {
+    eq: (target, filter) => target === filter,
 };
 
-const dateTypeFilterToOperationMap: Record<DateFilter['operation'], (message: Message<Date>, filter: DateFilter) => boolean> = {
-    eq: (message: Message<Date>, filter: DateFilter) => message[filter.field].getTime() === filter.value.getTime(),
-    after: (message: Message<Date>, filter: DateFilter) => message[filter.field].getTime() > filter.value.getTime(),
-    before: (message: Message<Date>, filter: DateFilter) => message[filter.field].getTime() < filter.value.getTime(),
+const dateTypeFilterToOperationMap: Record<DateFilter['operation'], OperationCb<Date>> = {
+    eq: coerceDateLikeToDateOperationCb((target: Date, filter: Date) => target.getTime() === filter.getTime()),
+    after: coerceDateLikeToDateOperationCb((target: Date, filter: Date) => target.getTime() > filter.getTime()),
+    before: coerceDateLikeToDateOperationCb((target: Date, filter: Date) => target.getTime() < filter.getTime()),
 };
 
-const getPrimitiveFilterCb = <T extends PrimitiveFilter>(filterType: T['type'], mapOfOperations: Record<T['operation'], OperationCb<any>>, exitOnError = true): FilterCb => {
+const getSimpleFilterCb = <T extends SimpleFilter>(filterType: T['type'], mapOfOperations: Record<T['operation'], OperationCb<any>>, validations: ValidationCb[]): FilterCb => {
     return (message: Message, filter: T) => {
         const targetValue = message[filter.field];
         const filterValue = filter.value;
         const filterOperation = filter.operation;
 
-        if (!checkOnType(targetValue, filterType, exitOnError)) {
-            return false;
+        if (!(validations.every(cb => cb(targetValue)))) {
+            return false
         }
-        if (!checkOnType(filterValue, filterType, exitOnError)) {
-            return false;
+        if (!(validations.every(cb => cb(targetValue)))) {
+            return false
         }
+
         if (checkOperationExist(filterOperation, mapOfOperations, filterType)) {
             return mapOfOperations[filterOperation](targetValue, filterValue);
         }
     }
 }
 
-const getFilterTypeToFilterFnMap: (exitOnError: boolean) => Record<Filter['type'], FilterCb> = (exitOnError: boolean) => ({
-    string: getPrimitiveFilterCb<StringFilter>('string', stringTypeFilterToOperationMap, exitOnError),
-    number: getPrimitiveFilterCb<NumberFilter>('number', numberTypeFilterToOperationMap, exitOnError),
-    boolean: getPrimitiveFilterCb<BooleanFilter>('boolean', booleanTypeFilterToOperationMap, exitOnError),
-    date: (message: Message, filter: DateFilter) => checkOnDate(dateTypeFilterToOperationMap[filter.operation])(message, filter),
+const filterTypeToFilterFnMap: Record<Filter['type'], FilterCb> = {
+    string: getSimpleFilterCb<StringFilter>('string', stringTypeFilterToOperationMap, [checkOnType('string')]),
+    number: getSimpleFilterCb<NumberFilter>('number', numberTypeFilterToOperationMap, [checkOnType('number')]),
+    boolean: getSimpleFilterCb<BooleanFilter>('boolean', booleanTypeFilterToOperationMap, [checkOnType('boolean')]),
+    date: getSimpleFilterCb<DateFilter>('date', dateTypeFilterToOperationMap, [checkOnCorrectDate]),
     or: (message: Message, filter: OrFilter) => true,
     and: (message: Message, filter: AndFilter) => true,
-})
+};
 
 export const filterMessages = (messages: Message[], filter: Filter, exitOnError = true): Message[] => {
-    const filterTypeToFilterFnMap = getFilterTypeToFilterFnMap(exitOnError);
-
     if (exitOnError) {
         try {
             return messages.filter((message: Message) => filterTypeToFilterFnMap[filter.type](message, filter));
