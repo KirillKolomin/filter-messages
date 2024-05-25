@@ -1,6 +1,6 @@
 export type DateType = Date | string;
 
-export type Message<T = string | boolean | DateType | number> = Record<string, T>;
+export type Message = Record<string, string | boolean | DateType | number>;
 
 export type StringFilter = {
     type: 'string';
@@ -41,4 +41,5 @@ export type AndFilter = {
 };
 
 export type Filter = StringFilter | NumberFilter | BooleanFilter | DateFilter | OrFilter | AndFilter;
-export type PrimitiveFilter = StringFilter | NumberFilter | BooleanFilter;
+export type SimpleFilter = StringFilter | NumberFilter | BooleanFilter | DateFilter;
+export type CombiningFilter = OrFilter | AndFilter
