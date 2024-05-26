@@ -22,8 +22,6 @@ const coerceDateLikeToDateOperationCb = (cb: OperationCb<DateType>): OperationCb
 }
 
 const checkOnType = (type: unknown): ValidationCb => (value: unknown): value is typeof type => typeof value === type
-const checkOperationExist = <T extends Record<string, OperationCb<any>>>(operationType: keyof T, map: T): operationType is keyof T => operationType in map;
-
 const checkOnCorrectDate: ValidationCb = (value: unknown): boolean => {
     let _value = value;
 
@@ -66,7 +64,7 @@ const dateTypeFilterToOperationMap: Record<DateFilter['operation'], OperationCb<
     before: coerceDateLikeToDateOperationCb((target: Date, filter: Date) => target.getTime() < filter.getTime()),
 };
 
-const getSimpleFilterCb = <T extends SimpleFilter>(filterType: T['type'], mapOfOperations: Record<T['operation'], OperationCb<any>>, validations: ValidationCb[]): FilterCb => {
+const getSimpleFilterCb = <T extends SimpleFilter>(mapOfOperations: Record<T['operation'], OperationCb<any>>, validations: ValidationCb[]): FilterCb => {
     return (message: Message, filter: T) => {
         const targetValue = message[filter.field];
         const filterValue = filter.value;
@@ -79,19 +77,22 @@ const getSimpleFilterCb = <T extends SimpleFilter>(filterType: T['type'], mapOfO
             return false
         }
 
-        if (checkOperationExist(filterOperation, mapOfOperations)) {
+        if (filterOperation in mapOfOperations) {
             return mapOfOperations[filterOperation](targetValue, filterValue);
         }
     }
 }
 
+const filterOrMessage: FilterCb = (message: Message, {filters}: OrFilter): boolean => filters.some((filter) => filterMessages([message], filter).length > 0)
+const filterAndMessage: FilterCb = (message: Message, {filters}: AndFilter): boolean => filters.every((filter) => filterMessages([message], filter).length > 0)
+
 const filterTypeToFilterFnMap: Record<Filter['type'], FilterCb> = {
-    string: getSimpleFilterCb<StringFilter>('string', stringTypeFilterToOperationMap, [checkOnType('string')]),
-    number: getSimpleFilterCb<NumberFilter>('number', numberTypeFilterToOperationMap, [checkOnType('number')]),
-    boolean: getSimpleFilterCb<BooleanFilter>('boolean', booleanTypeFilterToOperationMap, [checkOnType('boolean')]),
-    date: getSimpleFilterCb<DateFilter>('date', dateTypeFilterToOperationMap, [checkOnCorrectDate]),
-    or: (message: Message, filter: OrFilter) => true,
-    and: (message: Message, filter: AndFilter) => true,
+    string: getSimpleFilterCb<StringFilter>(stringTypeFilterToOperationMap, [checkOnType('string')]),
+    number: getSimpleFilterCb<NumberFilter>(numberTypeFilterToOperationMap, [checkOnType('number')]),
+    boolean: getSimpleFilterCb<BooleanFilter>(booleanTypeFilterToOperationMap, [checkOnType('boolean')]),
+    date: getSimpleFilterCb<DateFilter>(dateTypeFilterToOperationMap, [checkOnCorrectDate]),
+    or: filterOrMessage,
+    and: filterAndMessage,
 };
 
 export const filterMessages = (messages: Message[], filter: Filter): Message[] =>
