@@ -20,9 +20,9 @@ const coerceDateLikeToDateOperationCb = (cb: OperationCb<DateType>): OperationCb
     const filterDate = new Date(filterValue);
 
     return cb(targetDate, filterDate)
-}
+};
 
-const checkOnType = (type: unknown): ValidationCb => (value: unknown): value is typeof type => typeof value === type
+const checkOnType = (type: unknown): ValidationCb => (value: unknown): value is typeof type => typeof value === type;
 const checkOnCorrectDate: ValidationCb = (value: unknown): boolean => {
     let _value = value;
 
@@ -82,10 +82,10 @@ const getSimpleFilterCb = <T extends SimpleFilter>(mapOfOperations: Record<T['op
             return mapOfOperations[filterOperation](targetValue, filterValue);
         }
     }
-}
+};
 
-const filterOrMessage: FilterCb = (message: Message, {filters}: OrFilter): boolean => filters.some((filter) => filterMessages([message], filter).length > 0)
-const filterAndMessage: FilterCb = (message: Message, {filters}: AndFilter): boolean => filters.every((filter) => filterMessages([message], filter).length > 0)
+const filterOrMessage: FilterCb = (message: Message, {filters}: OrFilter): boolean => filters.some((filter) => filterMessages([message], filter).length > 0);
+const filterAndMessage: FilterCb = (message: Message, {filters}: AndFilter): boolean => filters.every((filter) => filterMessages([message], filter).length > 0);
 
 const filterTypeToFilterFnMap: Record<Filter['type'], FilterCb> = {
     string: getSimpleFilterCb<StringFilter>(stringTypeFilterToOperationMap, [checkOnType('string')]),
