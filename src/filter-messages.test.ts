@@ -51,7 +51,7 @@ const complexMessage4 = {
     field2: new Date('2030-01-01T12:00:00.000Z').toISOString(),
 }
 
-const messageWithNestedObjects: Message = {
+const messageWithNestedObjects = {
     nestedObject: {
         nestedField1: {
             number: 1,
@@ -179,4 +179,24 @@ describe('filterMessages', () => {
             })
         ).toEqual([messageWithNestedObjects])
     })
+
+    it('works on nested objects with non-existing fields', () => {
+        expect(
+            filterMessages(messages, {
+                type: 'number',
+                field: 'nestedObject.nonExistingField',
+                value: 1,
+                operation: 'eq',
+            }),
+        ).toEqual([]);
+
+        expect(
+            filterMessages(messages, {
+                type: 'string',
+                field: 'nestedObject.nestedField1.nonExistingField',
+                value: 'non-existing',
+                operation: 'eq',
+            }),
+        ).toEqual([]);
+    });
 });
