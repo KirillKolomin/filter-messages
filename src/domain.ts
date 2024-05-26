@@ -1,6 +1,10 @@
 export type DateType = Date | string;
 
-export type Message = Record<string, string | boolean | DateType | number>;
+type TopLevelMessageValue = string | boolean | DateType | number;
+interface MessageValues {
+    [key: string]: TopLevelMessageValue | MessageValues;
+}
+export type Message = MessageValues;
 
 export type StringFilter = {
     type: 'string';

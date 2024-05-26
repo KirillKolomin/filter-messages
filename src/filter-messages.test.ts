@@ -1,5 +1,5 @@
-import {filterMessages} from "./filter-messages";
-import {Message} from "./domain";
+import {filterMessages} from './filter-messages';
+import {Message} from './domain';
 
 const boolTrue = {
     boolean: true,
@@ -51,6 +51,15 @@ const complexMessage4 = {
     field2: new Date('2030-01-01T12:00:00.000Z').toISOString(),
 }
 
+const messageWithNestedObjects: Message = {
+    nestedObject: {
+        nestedField1: {
+            number: 1,
+            string: '1'
+        }
+    }
+}
+
 const messages: Message[] = [
     boolTrue,
     boolFalse,
@@ -63,6 +72,7 @@ const messages: Message[] = [
     complexMessage,
     complexMessage2,
     complexMessage3,
+    messageWithNestedObjects,
 ];
 
 describe('filterMessages', () => {
@@ -147,4 +157,26 @@ describe('filterMessages', () => {
             }),
         ).toEqual([complexMessage, complexMessage3]);
     });
+
+    it('works on nested objects', () => {
+        expect(
+            filterMessages(messages, {
+                type: 'and',
+                filters: [
+                    {
+                        type: 'number',
+                        field: 'nestedObject.nestedField1.number',
+                        value: 1,
+                        operation: 'eq'
+                    },
+                    {
+                        type: 'string',
+                        field: 'nestedObject.nestedField1.string',
+                        value: '1',
+                        operation: 'eq'
+                    }
+                ]
+            })
+        ).toEqual([messageWithNestedObjects])
+    })
 });

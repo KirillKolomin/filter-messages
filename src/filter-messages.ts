@@ -9,6 +9,7 @@ import {
     SimpleFilter,
     StringFilter
 } from "./domain";
+import {get} from 'lodash';
 
 type FilterCb = (message: Message, filter: Filter) => boolean;
 type OperationCb<T> = (targetValue: T, filterValue: T) => boolean;
@@ -66,9 +67,9 @@ const dateTypeFilterToOperationMap: Record<DateFilter['operation'], OperationCb<
 
 const getSimpleFilterCb = <T extends SimpleFilter>(mapOfOperations: Record<T['operation'], OperationCb<any>>, validations: ValidationCb[]): FilterCb => {
     return (message: Message, filter: T) => {
-        const targetValue = message[filter.field];
-        const filterValue = filter.value;
-        const filterOperation = filter.operation;
+        const targetValue: unknown | undefined = get(message, filter.field, undefined);
+        const filterValue: SimpleFilter['value'] = filter.value;
+        const filterOperation: SimpleFilter['operation'] = filter.operation;
 
         if (!(validations.every(cb => cb(targetValue)))) {
             return false
