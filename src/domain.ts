@@ -1,9 +1,11 @@
 export type DateType = Date | string;
 
 type TopLevelMessageValue = string | boolean | DateType | number;
+
 interface MessageValues {
     [key: string]: TopLevelMessageValue | MessageValues;
 }
+
 export type Message = MessageValues;
 
 export type StringFilter = {
